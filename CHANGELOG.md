@@ -4,6 +4,35 @@ All notable changes to `provenance-gate` and `provenance-gate-signer` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.1] / [provenance-gate-signer 0.1.3] — 2026-07-12 (release hygiene + portability)
+
+### Fixed
+- **Cross-platform CI (macOS + Windows).** Source-verified, not assumed:
+  - macOS: AF_UNIX `sun_path` is capped at **104 bytes** on macOS/BSD
+    (`char sun_path[104]`; Linux 108). Tests bound UNIX sockets under pytest's
+    long `tmp_path` (~124 bytes on macOS runners) → `bind()` raised before
+    `listen()`, so the server-readiness Event never set. Added a `short_sock`
+    conftest fixture that binds under a short `tempfile.mkdtemp()` path and
+    converted all five UNIX-socket tests to it.
+  - Windows: `socket.AF_UNIX` is **undefined on win32** (CPython #77589 open;
+    typeshed excludes it). The signer is POSIX-only by design — its security
+    boundary is an AF_UNIX socket — so Windows was dropped from the signer CI
+    matrix (core still covers Windows).
+- **Server-readiness race.** `SigningService.serve_path` now sets a `_ready`
+  Event after `listen()`, and fixtures/tests wait on it instead of polling the
+  socket file (which races bind vs listen and never sees AF_UNIX sockets, whose
+  size is 0).
+- **CI hardening.** All third-party actions pinned to full commit SHAs
+  (supply-chain integrity); `actions/checkout`, `actions/setup-python`,
+  `semgrep/semgrep-action` (repo moved returntocorp→semgrep; SHA resolver
+  follows the tag redirect but not a raw-SHA redirect, so the SHA is pinned
+  under the current owner). Added least-privilege `permissions: contents: read`
+  and a `concurrency` group. Enabled pip caching. The build step now performs
+  real T1 verification: build wheel → install into a clean venv → import-smoke.
+
+### Security
+- CI SAST (Bandit + Semgrep) continues green across the matrix.
+
 ## [2.0.0] — Semver-Major
 
 ### Added

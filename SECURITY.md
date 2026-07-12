@@ -1,68 +1,51 @@
-# Security Policy — provenance-gate
+# Security Policy
 
-This document states, honestly, what `provenance-gate` does and does **not**
-protect. We prefer accurate boundaries over reassuring language.
+## Scope
 
-## Threat model
+`provenance-gate` is a **governance discipline** layer for agent systems. It
+gates actions (BUILD / VERIFY / COMMIT, etc.) behind evidence-quality tiers
+(T1–T5) and records every accepted step in a hash-chained, nonce-protected
+append-only ledger. The point is to make "I verified this" *demonstrable* and
+to defend against an agent (or its operator) asserting success it did not earn.
 
-### In scope (what this package defends)
+## Threat model (stated honestly)
 
-- **Hallucinated authorization.** An agent cannot claim BUILD/VERIFY/COMMIT
-  authority from a lower-tier (T2–T5) assertion. `RuleSet.validate` enforces
-  the step→minimum-tier map; only T1 (real, executed, captured) evidence
-  authorizes a high-assurance action.
-- **Forged in-process evidence (core).** `TerminalCapture` signs command
-  output with an HMAC key held in the agent process. This prevents *accidental*
-  or *downstream* mislabeling of evidence within a trusted process.
-- **Forged evidence from a compromised agent process (signer extension).** With
-  `provenance-gate-signer`, the Ed25519 private key lives in a **separate
-  privileged process**. A compromised agent can request capture but cannot
-  mint a valid signature — it never holds the key and cannot invoke the
-  service's signing path. Verification uses only the public key.
-- **Tampering / replay.** `AppendOnlyLedger` hash-chains entries and rejects
-  nonce replay. `verify()` rejects wrong-key, flipped-message, and
-  flipped-signature inputs (property-tested).
-- **Injection in the capture path.** Capture runs commands as an explicit argv
-  list with `shell=False` (verified by SAST). No `eval`/`exec`/`pickle`/
-  `marshal.loads` on untrusted input (verified by SAST).
+| Threat | Addressed? | How |
+| --- | --- | --- |
+| Agent claims a build passed without running it | Yes | Only `T1` (executed + signed-capture) evidence authorizes BUILD/VERIFY/COMMIT. `verify_claim` rejects non-T1 / forged artifacts. |
+| Tampering with the ledger after the fact | Yes | Ledger is hash-chained; `_load_and_verify()` raises `LedgerIntegrityError` on a hash/prev-hash/nonce mismatch. |
+| Nonce replay of a ledger entry | Yes | `AppendOnlyLedger.append` requires a unique `nonce`; replay is detected on load. |
+| In-process adversary forges a signature | Yes (signer ext) | `provenance-gate-signer` holds the Ed25519 private key in a **separate process**; the agent only ever sees attested captures + the public key. |
+| Ed25519 forgery / tamper acceptance | Yes (signer ext) | Verified-against-affine-reference projective arithmetic; canonical-encoding compare with `hmac.compare_digest`. Property/fuzz tests reject tampered/forged inputs. |
 
-### Out of scope (what this package does NOT guarantee)
+### What this package does NOT guarantee
 
-- **Malicious insiders with the signing key.** Whoever holds the Ed25519
-  private key can produce valid signatures. Protect the key like any secret.
-- **Compromise of the privileged signing process.** If the signing process
-  itself is taken over, its signatures are trusted by design. Run it with least
-  privilege, isolated from the agent.
-- **Supply-chain of dependencies.** We pin and test, but do not vouch for
-  third-party packages beyond our tests. Review your environment.
-- **Side-channel leakage of non-secret values.** Constant-time comparison is
-  used on signature material; we do not claim broad constant-time guarantees
-  across the whole crypto stack.
+- **The HMAC signing secret is process-local.** It binds evidence to the
+  process that produced it; it is a *discipline mechanism*, not a
+  cryptographic isolation boundary against a compromised host. A process that
+  can read the secret can sign its own artifacts — so treat the secret like any
+  other in-process credential.
+- **It does not sandbox the agent.** It gates *decisions*, not *execution*.
+  Pair it with OS-level isolation for untrusted agents.
+- **Supply-chain integrity of dependencies** is the consumer's
+  responsibility. We pin our own CI actions to commit SHAs; you should pin
+  `provenance-gate` in your own lockfiles.
 
-## Supported versions
+## Supported platforms
 
-Security fixes target the latest released minor of `provenance-gate` (2.x) and
-`provenance-gate-signer` (0.1.x). Older majors are not patched.
+- Core (`provenance-gate`): Linux, macOS, Windows — Python 3.10–3.13.
+- Signer (`provenance-gate-signer`): **POSIX only** (Linux, macOS). Its
+  security boundary is an `AF_UNIX` socket, which CPython does not expose on
+  Windows (CPython #77589 open). On Windows, use the in-process `guard_verify`
+  path instead.
 
 ## Reporting a vulnerability
 
-**Do not open a public GitHub issue for security vulnerabilities.**
+Open a private security advisory on the repository, or file an issue marked
+`security`. Do not disclose publicly until a fix is released.
 
-Email the maintainers (see repository metadata) with:
+## Static analysis
 
-- a description of the vulnerability and its impact,
-- steps to reproduce,
-- affected version(s).
-
-We aim to acknowledge within 72 hours and to provide a remediation timeline
-within 7 days. Coordinated disclosure is preferred; we will credit reporters
-who wish to be named.
-
-## Cryptography notes
-
-- Ed25519 implementation follows RFC 8032. The signing/verify math was verified
-  bit-equal against an affine reference and fuzz-tested for tamper/forgery
-  rejection. Sign+verify was measured ~19x faster after moving to iterative
-  projective arithmetic (single modular inversion per operation).
-- Verification compares canonical point encodings with `hmac.compare_digest`
-  (constant-time), not `==`.
+CI runs Bandit and a custom Semgrep ruleset (`semgrep.yml`) as four invariants;
+`scripts/sast_invariant_scan.py` enforces the same locally without the
+glibc-only `semgrep-core` binary.

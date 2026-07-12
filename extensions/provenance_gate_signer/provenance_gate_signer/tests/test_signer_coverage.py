@@ -31,7 +31,8 @@ import struct
 import threading
 
 import pytest
-from provenance_gate_signer import CaptureClient, generate_keypair, SigningService
+
+from provenance_gate_signer import CaptureClient, SigningService, generate_keypair
 from provenance_gate_signer.client import _recv_json as _client_recv_json
 from provenance_gate_signer.client import _send_json
 from provenance_gate_signer.keys import sign, verify

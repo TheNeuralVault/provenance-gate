@@ -21,8 +21,10 @@ from __future__ import annotations
 import os
 import random
 
-from hypothesis import given, strategies as st
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+
 from provenance_gate_signer import generate_keypair
 from provenance_gate_signer.keys import sign, verify
 

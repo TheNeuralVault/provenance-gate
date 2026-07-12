@@ -77,8 +77,13 @@ jobs:
       - name: Ruff (signer)
         run: ruff check extensions/provenance_gate_signer
 
+      # Run mypy from the extension dir so its own pyproject [tool.mypy]
+      # (exclude = "tests") applies. Running `mypy extensions/...` from the
+      # repo root uses the ROOT config (no test exclude) and strict-checks the
+      # unannotated test files -> 35 spurious errors. `cd` + `.` is the fix.
       - name: Mypy (signer, strict)
-        run: mypy extensions/provenance_gate_signer
+        working-directory: extensions/provenance_gate_signer
+        run: mypy .
 
       - name: Pytest (signer, with coverage gate)
         run: pytest -q extensions/provenance_gate_signer/provenance_gate_signer/tests
@@ -102,8 +107,13 @@ jobs:
           pip install -e "./extensions/provenance_gate_signer[dev]"
           pip install hypothesis
       - name: Fuzz signer crypto invariants
+        # -o addopts="" clears the package pyproject [tool.pytest.ini_options]
+        # addopts (which force --cov/--cov-fail-under). Without it, the signer
+        # extension's own addopts re-inject a coverage gate that the fuzz run
+        # cannot satisfy (it only exercises crypto paths, not full coverage).
+        # --no-cov is kept as a belt-and-suspenders guard.
         run: >-
-          pytest -q --no-cov
+          pytest -q -o addopts="" --no-cov
           extensions/provenance_gate_signer/provenance_gate_signer/tests/test_fuzz.py
           --hypothesis-seed=1
 

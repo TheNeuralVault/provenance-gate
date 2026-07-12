@@ -21,16 +21,13 @@ from __future__ import annotations
 import os
 import random
 
+import hypothesis
 import pytest
+from hypothesis import given, strategies as st
 from provenance_gate_signer import generate_keypair
 from provenance_gate_signer.keys import sign, verify
 
-try:  # pragma: no cover - import shim
-    from hypothesis import given, strategies as st
-
-    _HAVE_HYPOTHESIS = True
-except Exception:  # pragma: no cover
-    _HAVE_HYPOTHESIS = False
+_HAVE_HYPOTHESIS = True
 
 
 def _flip_byte(data: bytes) -> bytes:

@@ -74,7 +74,6 @@ def test_capture_client_requires_endpoint():
 def test_capture_client_raises_on_service_error(tmp_path, keypair):
     # client.py:100 — when the service returns {"error": ...} the client must
     # surface it as a RuntimeError rather than building a bogus capture.
-    priv, pub = keypair
     sock = str(tmp_path / "err.sock")
 
     # Serve exactly one connection that replies with an error frame, then stop.

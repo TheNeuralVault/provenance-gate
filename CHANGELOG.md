@@ -4,6 +4,17 @@ All notable changes to `provenance-gate` and `provenance-gate-signer` are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [provenance-gate-signer 0.1.4] — 2026-07-12 (metadata accuracy)
+
+### Fixed
+- Signer `pyproject.toml` now declares explicit trove classifiers including
+  `Operating System :: POSIX :: Linux` and `Operating System :: MacOS`,
+  correctly reflecting that the signer is **POSIX-only** (its security
+  boundary is an `AF_UNIX` socket, which CPython does not expose on Windows;
+  CPython #77589 open). Previously the package shipped without classifiers,
+  defaulting to an OS-agnostic implication. Classifier strings validated
+  against the PyPI trove classifier list.
+
 ## [2.0.1] / [provenance-gate-signer 0.1.3] — 2026-07-12 (release hygiene + portability)
 
 ### Fixed

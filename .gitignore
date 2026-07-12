@@ -1,0 +1,24 @@
+# caches / build artifacts
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# local scratch
+hermes_task.ledger.json
+*.ledger.json
+.venv/
+venv/
+
+# editor
+.vscode/
+.idea/
+
+# packaged skill zip (build artifact)
+provenance_gate_skill.zip

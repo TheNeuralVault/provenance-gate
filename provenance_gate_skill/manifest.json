@@ -1,0 +1,6 @@
+{
+  "name": "provenance_gate",
+  "version": "2.0.0",
+  "entrypoint": "provenance_gate_skill",
+  "description": "Governance, pipeline, evidence, and hallucination defense for Hermes agents."
+}

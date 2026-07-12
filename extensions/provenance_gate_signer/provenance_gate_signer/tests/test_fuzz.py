@@ -22,7 +22,6 @@ import os
 import random
 
 import pytest
-
 from provenance_gate_signer import generate_keypair
 from provenance_gate_signer.keys import sign, verify
 

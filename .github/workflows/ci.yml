@@ -102,8 +102,9 @@ jobs:
           pip install -e "./extensions/provenance_gate_signer[dev]"
           pip install hypothesis
       - name: Fuzz signer crypto invariants
-        run: >
-          pytest -q extensions/provenance_gate_signer/provenance_gate_signer/tests/test_fuzz.py
+        run: >-
+          pytest -q --no-cov
+          extensions/provenance_gate_signer/provenance_gate_signer/tests/test_fuzz.py
           --hypothesis-seed=1
 
   # ---------------------------------------------------------------------------

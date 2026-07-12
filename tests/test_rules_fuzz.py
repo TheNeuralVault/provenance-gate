@@ -19,10 +19,8 @@ from __future__ import annotations
 
 import random
 
-import pytest
-
-from provenance_gate.rules import RuleSet, STEP_REQUIREMENTS, VALID_VERIFY_SOURCES
-from provenance_gate.tiers import Tier, TIER_FROM_STRING
+from provenance_gate.rules import STEP_REQUIREMENTS, VALID_VERIFY_SOURCES, RuleSet
+from provenance_gate.tiers import TIER_FROM_STRING, Tier
 
 _TIERS = list(Tier)
 _STEPS = list(STEP_REQUIREMENTS)
@@ -65,7 +63,7 @@ def test_ruleset_fuzz_deterministic() -> None:
         step = rng.choice(_STEPS)
         if step == "VERIFY":
             # mix valid and invalid sources
-            src = rng.choice(list(VALID_VERIFY_SOURCES) + ["bogus", "another"])
+            src = rng.choice([*list(VALID_VERIFY_SOURCES), "bogus", "another"])
         else:
             src = None
         _check(tier, step, src)

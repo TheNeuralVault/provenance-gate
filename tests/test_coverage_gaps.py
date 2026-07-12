@@ -15,7 +15,7 @@ import pytest
 
 from provenance_gate.evidence import EvidenceArtifact
 from provenance_gate.guards import guard_verify
-from provenance_gate.ledger import AppendOnlyLedger, GENESIS_HASH, LedgerEntry
+from provenance_gate.ledger import GENESIS_HASH, AppendOnlyLedger, LedgerEntry
 from provenance_gate.pipeline import PipelineState
 from provenance_gate.tiers import Tier
 

@@ -97,7 +97,7 @@ class SigningService:
                 srv.settimeout(0.2)
                 try:
                     conn, _ = srv.accept()
-                except socket.timeout:
+                except TimeoutError:
                     continue
                 with conn:
                     try:
@@ -119,7 +119,7 @@ class SigningService:
                 srv.settimeout(0.2)
                 try:
                     conn, _ = srv.accept()
-                except socket.timeout:
+                except TimeoutError:
                     continue
                 with conn:
                     try:

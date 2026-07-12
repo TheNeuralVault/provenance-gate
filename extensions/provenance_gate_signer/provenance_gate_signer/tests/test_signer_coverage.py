@@ -31,11 +31,11 @@ import struct
 import threading
 
 import pytest
-
 from provenance_gate_signer import CaptureClient, SigningService, generate_keypair
-from provenance_gate_signer.client import _recv_json as _client_recv_json, _send_json
-from provenance_gate_signer.service import _recv_json as _service_recv_json
+from provenance_gate_signer.client import _recv_json as _client_recv_json
+from provenance_gate_signer.client import _send_json
 from provenance_gate_signer.keys import sign, verify
+from provenance_gate_signer.service import _recv_json as _service_recv_json
 
 
 @pytest.fixture
@@ -76,10 +76,9 @@ def test_capture_client_raises_on_service_error(tmp_path, keypair):
     # surface it as a RuntimeError rather than building a bogus capture.
     priv, pub = keypair
     sock = str(tmp_path / "err.sock")
-    svc = SigningService(priv, pub)
 
     # Serve exactly one connection that replies with an error frame, then stop.
-    ready: "queue.Queue[int]" = queue.Queue()
+    ready: queue.Queue[int] = queue.Queue()
 
     def _feed_error() -> None:
         srv = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
@@ -118,7 +117,7 @@ class _FakeConn:
     def __init__(self, chunks: list[bytes]) -> None:
         self._chunks = list(chunks)
 
-    def recv(self, n: int) -> bytes:  # noqa: D401 - intentionally socket-shaped
+    def recv(self, n: int) -> bytes:  # intentionally socket-shaped
         if not self._chunks:
             return b""  # EOF
         chunk = self._chunks.pop(0)
@@ -222,7 +221,14 @@ def test_verify_rejects_non_base64():
 def test_keys_scalarmult_neutral_and_identity_add():
     # Edge branches in the projective ladder: scalar 0 -> neutral point, and
     # adding the neutral (identity) point leaves the point unchanged.
-    from provenance_gate_signer.keys import _G, _edwards_add, _scalarmult, _to_proj, _from_proj, _edwards_add_proj
+    from provenance_gate_signer.keys import (
+        _G,
+        _edwards_add,
+        _edwards_add_proj,
+        _from_proj,
+        _scalarmult,
+        _to_proj,
+    )
 
     assert _scalarmult(_G, 0) == (0, 1)
     # identity + P == P (also drives the z==0 early-return in _from_proj when

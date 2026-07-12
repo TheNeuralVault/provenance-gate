@@ -7,7 +7,7 @@ name = "provenance-gate"
 version = "2.0.0"
 description = "Gate agent actions by evidence quality tier with structural governance and actor lineage"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 authors = [{name = "NeuralVault Contributors"}]
 readme = "README.md"
 
@@ -21,7 +21,6 @@ keywords = [
 ]
 
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -50,6 +49,7 @@ dev = [
     "mypy>=1.0",
     "ruff>=0.5",
     "hypothesis>=6.0",
+    "bandit>=1.7",
 ]
 
 [tool.setuptools.packages.find]
@@ -89,4 +89,12 @@ ignore = [
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.bandit]
+skips = [
+    "B101",  # assert_used (we use asserts as contract checks in tests/guard paths)
+    "B603",  # subprocess_without_shell (we intentionally use subprocess without shell)
+    "B607",  # start_process_with_partial_path
+]
+exclude_dirs = ["tests", "build", ".venv", "examples"]
 

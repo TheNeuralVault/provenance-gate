@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import re
 import secrets
-import subprocess
+import subprocess  # nosec B404 -- deliberate out-of-process capture/signing contract
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 

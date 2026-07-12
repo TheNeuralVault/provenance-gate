@@ -1,0 +1,22 @@
+# Bandit SAST configuration for provenance-gate.
+# Run: bandit -c bandit.yaml -r src extensions -x '*/tests/*,*/build/*'
+#
+# We keep subprocess usage (capture.py, service.py) because it is core to the
+# evidence-capture design — but Bandit still flags accidental shell=True and
+# world-writable files, which is exactly what we want to guard.
+
+skips:
+  - B101   # assert_used: asserts are intentional contract checks, not safety
+  - B603   # subprocess_without_shell: we never use shell=True
+  - B607   # start_process_with_partial_path: child commands are explicit lists
+
+exclude_dirs:
+  - tests
+  - build
+  - .venv
+  - examples
+  - node_modules
+
+# Severity/confidence gate: fail the build on anything HIGH-confidence and
+# medium+ severity (the default profile already covers this; explicit so CI
+# is self-documenting).

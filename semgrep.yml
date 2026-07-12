@@ -1,0 +1,58 @@
+# Semgrep ruleset for provenance-gate security properties.
+# Run: semgrep --config semgrep.yml --error src extensions
+#
+# These custom rules encode the project's hard invariants so a regression is a
+# CI failure, not a code review comment:
+#   1. The signing private key must NEVER leave the SigningService process.
+#   2. Evidence capture must use a real subprocess (no shell).
+#   3. No use of eval/exec/marshal/pickle on untrusted input.
+#   4. HMAC/Ed25519 verification must use constant-time comparison.
+
+rules:
+  - id: private-key-leak
+    severity: ERROR
+    languages: [python]
+    message: >
+      The Ed25519 private key must stay inside SigningService. Do not pass it to
+      CaptureClient, AttestedCapture, or any agent-side object.
+    patterns:
+      - pattern-either:
+          - pattern: CaptureClient(..., private_key=..., ...)
+          - pattern: AttestedCapture(..., private_key=..., ...)
+      - pattern-not: SigningService(private_key=..., ...)
+
+  - id: shell-in-capture
+    severity: ERROR
+    languages: [python]
+    message: >
+      Evidence capture must run with shell=False (explicit argv list) to avoid
+      command injection in the T1 capture path.
+    patterns:
+      - pattern: subprocess.run(..., shell=True, ...)
+      - pattern-not: subprocess.run(..., shell=False, ...)
+
+  - id: dangerous-deserialization
+    severity: ERROR
+    languages: [python]
+    message: >
+      Do not use eval/exec/marshal/pickle on untrusted input (signatures,
+      captured output, network frames).
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+      - pattern: marshal.loads(...)
+      - pattern: pickle.loads(...)
+
+  - id: nonconstant-time-compare
+    severity: WARNING
+    languages: [python]
+    message: >
+      Signature/HMAC comparison must use hmac.compare_digest, not ==.
+    pattern-not: hmac.compare_digest(...)
+    pattern-either:
+      - pattern: $A == $B
+      - pattern: $A != $B
+    paths:
+      include:
+        - "src/provenance_gate/capture.py"
+        - "extensions/provenance_gate_signer/provenance_gate_signer/keys.py"

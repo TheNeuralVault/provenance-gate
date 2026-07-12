@@ -46,7 +46,11 @@ def service_thread(tmp_path, keypair):
         time.sleep(0.01)
     else:
         raise RuntimeError("signing service socket never appeared: " + sock)
-    return sock, pub
+    try:
+        yield sock, pub
+    finally:
+        svc.shutdown()
+        t.join(timeout=2)
 
 
 # --------------------------------------------------------------------------
@@ -197,6 +201,141 @@ def test_tcp_transport(keypair):
     s.close()
     t = threading.Thread(target=svc.serve_tcp, args=("127.0.0.1", port), daemon=True)
     t.start()
-    client = CaptureClient(host="127.0.0.1", port=port)
+    # Wait until the server is actually listening (avoids connect-before-listen race).
+    import time
+
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            probe.connect(("127.0.0.1", port))
+            probe.close()
+            break
+        except OSError:
+            time.sleep(0.02)
+    try:
+        client = CaptureClient(host="127.0.0.1", port=port)
+        cap = client.capture(["true"])
+        assert cap.is_valid(public_key=pub)
+    finally:
+        svc.shutdown()
+        t.join(timeout=2)
+
+
+def test_malformed_request_does_not_kill_server(service_thread):
+    """A bad client frame must be answered with an error, not crash the loop."""
+    sock, pub = service_thread
+    import socket as _s
+    import struct as _st
+    raw = _s.socket(_s.AF_UNIX, _s.SOCK_STREAM)
+    raw.connect(sock)
+    raw.sendall(_st.pack("!I", 4) + b"nope")
+    resp = raw.recv(4096)
+    raw.close()
+    assert b"error" in resp
+    client = CaptureClient(sock_path=sock)
     cap = client.capture(["true"])
     assert cap.is_valid(public_key=pub)
+
+
+def test_run_service_entrypoint(tmp_path):
+    """run_service() serves a request end-to-end and can be stopped cleanly.
+
+    run_service() serves in its own background thread and returns the instance,
+    so we just wait for the socket and capture.
+    """
+    import os as _os
+    import time as _t
+
+    from provenance_gate_signer import service as _svc
+    sock = str(tmp_path / "rs.sock")
+    svc = _svc.run_service(sock)  # type: ignore[call-arg]
+    for _ in range(200):
+        if _os.path.exists(sock):
+            break
+        _t.sleep(0.01)
+    else:
+        raise RuntimeError("run_service socket never appeared")
+    try:
+        client = CaptureClient(sock_path=sock)
+        cap = client.capture(["true"])
+        assert cap.is_valid(public_key=cap.pubkey)
+    finally:
+        svc.shutdown()
+
+
+def test_run_service_generates_keys_when_absent(tmp_path):
+    """run_service() keygen fallback: with no keys supplied it generates a
+    valid Ed25519 keypair and serves real signed captures.
+
+    run_service() now serves in its own background thread and returns the
+    instance, so we simply wait for the socket to appear and then capture.
+    """
+    import os as _os
+    import time as _t
+
+    from provenance_gate_signer import service as _svc
+    sock = str(tmp_path / "rs2.sock")
+    svc = _svc.run_service(sock)  # no keys -> generate_keypair() branch
+    for _ in range(200):
+        if _os.path.exists(sock):
+            break
+        _t.sleep(0.01)
+    else:
+        raise RuntimeError("run_service socket never appeared")
+    try:
+        client = CaptureClient(sock_path=sock)
+        cap = client.capture(["python", "-c", "print('keygen path')"])
+        # The generated key must actually verify its own signature.
+        assert cap.is_valid(public_key=cap.pubkey)
+        assert "keygen path" in cap.content
+    finally:
+        svc.shutdown()
+
+
+EXACT_HOST, EXACT_PORT = "127.0.0.1", 8731
+
+
+def test_exact_endpoint_subprocess():
+    """The real run_endpoint.py as a separate process on 127.0.0.1:8731.
+
+    Locks the published endpoint contract: a standalone signing service
+    process (holding the private key) serves an agent client that only ever
+    holds the public key. Catches any break in the two-process deployment
+    shape, not just in-thread serve_once.
+    """
+    import os as _os
+    import socket as _s
+    import subprocess as _sp
+    import sys as _sys
+    import time as _t
+
+    here = _os.path.dirname(_os.path.dirname(_os.path.dirname(
+        _os.path.abspath(__file__))))
+    ep = _os.path.join(here, "run_endpoint.py")
+    proc = _sp.Popen([_sys.executable, ep],
+                     stdout=_sp.PIPE, stderr=_sp.STDOUT)
+    try:
+        for _ in range(100):
+            try:
+                c = _s.socket(_s.AF_INET, _s.SOCK_STREAM)
+                c.settimeout(0.2)
+                c.connect((EXACT_HOST, EXACT_PORT))
+                c.close()
+                break
+            except OSError:
+                _t.sleep(0.05)
+        else:
+            raise RuntimeError("exact endpoint never came up")
+        client = CaptureClient(host=EXACT_HOST, port=EXACT_PORT)
+        cap = client.capture(["python", "-c", "print('attested via exact endpoint')"])
+        assert cap.exit_code == 0
+        assert cap.is_valid(public_key=cap.pubkey)
+        art = cap.to_t1_artifact()
+        assert art.tier.name == "T1"
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            proc.kill()

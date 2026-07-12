@@ -7,11 +7,16 @@ on:
     branches: [main]
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Core package: lint / type / test(cover) / build / twine, across OS + Python
+  # ---------------------------------------------------------------------------
   test:
-    runs-on: ubuntu-latest
+    name: "core ${{ matrix.os }} py${{ matrix.python-version }}"
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
@@ -42,3 +47,82 @@ jobs:
 
       - name: Twine check (release metadata)
         run: twine check dist/*
+
+  # ---------------------------------------------------------------------------
+  # Signer extension (depends on core): same OS x Python matrix
+  # ---------------------------------------------------------------------------
+  signer:
+    name: "signer ${{ matrix.os }} py${{ matrix.python-version }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install core + signer dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install -e "./extensions/provenance_gate_signer[dev]"
+
+      - name: Ruff (signer)
+        run: ruff check extensions/provenance_gate_signer
+
+      - name: Mypy (signer, strict)
+        run: mypy extensions/provenance_gate_signer
+
+      - name: Pytest (signer, with coverage gate)
+        run: pytest -q extensions/provenance_gate_signer/provenance_gate_signer/tests
+
+  # ---------------------------------------------------------------------------
+  # Property-based fuzzing (Hypothesis) — Linux only, dedicated job so a fuzz
+  # regression is reported distinctly from the unit matrix.
+  # ---------------------------------------------------------------------------
+  fuzz:
+    name: "fuzz py3.12"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install -e "./extensions/provenance_gate_signer[dev]"
+          pip install hypothesis
+      - name: Fuzz signer crypto invariants
+        run: >
+          pytest -q extensions/provenance_gate_signer/provenance_gate_signer/tests/test_fuzz.py
+          --hypothesis-seed=1
+
+  # ---------------------------------------------------------------------------
+  # SAST — Bandit (Python) + Semgrep (custom invariant rules)
+  # ---------------------------------------------------------------------------
+  sast:
+    name: "sast"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit
+          bandit -c bandit.yaml -r src extensions -x '*/tests/*,*/build/*'
+      - name: Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: semgrep.yml

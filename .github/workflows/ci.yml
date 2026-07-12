@@ -1,5 +1,14 @@
 name: CI
 
+# Least-privilege token by default. Jobs widen only where strictly needed.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
@@ -20,12 +29,16 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to full commit SHA (supply-chain integrity). Update via
+      # `gh api repos/actions/checkout/commits?sha=v4` when bumping.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Install package + dev deps
         run: |
@@ -44,6 +57,16 @@ jobs:
 
       - name: Build (wheel + sdist)
         run: python -m build
+
+      # T1 build verification: install the freshly built wheel into a CLEAN
+      # venv and import-smoke it. twine check only validates metadata — it
+      # does NOT prove the artifact installs or imports. This does.
+      - name: Verify build (clean install + import smoke)
+        run: |
+          python -m venv .venv-verify
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.whl
+          python -c "import provenance_gate; print('import ok', provenance_gate.__name__)"
 
       - name: Twine check (release metadata)
         run: twine check dist/*
@@ -64,12 +87,14 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: extensions/provenance_gate_signer/pyproject.toml
 
       - name: Install core + signer dev deps
         run: |
@@ -99,10 +124,12 @@ jobs:
     name: "fuzz py3.12"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: extensions/provenance_gate_signer/pyproject.toml
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
@@ -127,16 +154,19 @@ jobs:
     name: "sast"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Bandit
         run: |
           python -m pip install --upgrade pip
           pip install bandit
           bandit -c bandit.yaml -r src extensions -x '*/tests/*,*/build/*'
       - name: Semgrep
-        uses: returntocorp/semgrep-action@v1
+        # Pinned to full commit SHA (supply-chain integrity).
+        uses: returntocorp/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e4
         with:
           config: semgrep.yml

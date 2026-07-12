@@ -72,10 +72,10 @@ def test_capture_client_requires_endpoint():
         CaptureClient()  # type: ignore[call-arg]
 
 
-def test_capture_client_raises_on_service_error(tmp_path, keypair):
+def test_capture_client_raises_on_service_error(short_sock, keypair):
     # client.py:100 — when the service returns {"error": ...} the client must
     # surface it as a RuntimeError rather than building a bogus capture.
-    sock = str(tmp_path / "err.sock")
+    sock = short_sock
 
     # Serve exactly one connection that replies with an error frame, then stop.
     ready: queue.Queue[int] = queue.Queue()
@@ -145,10 +145,10 @@ def test_service_public_key_property(keypair):
     assert svc.public_key == pub
 
 
-def test_service_unlink_existing_socket_on_bind(tmp_path, keypair):
+def test_service_unlink_existing_socket_on_bind(short_sock, keypair):
     # service.py:83 — serve_path must remove a stale socket file before bind.
     priv, pub = keypair
-    sock = str(tmp_path / "stale.sock")
+    sock = short_sock
     # Pre-create a stale (non-listening) socket file.
     _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM).bind(sock)
 

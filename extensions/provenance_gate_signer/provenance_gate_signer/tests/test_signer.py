@@ -29,10 +29,10 @@ def keypair():
 
 
 @pytest.fixture
-def service_thread(tmp_path, keypair):
+def service_thread(short_sock, keypair):
     """Spin up a real SigningService on a UNIX socket in a background thread."""
     priv, pub = keypair
-    sock = str(tmp_path / "sign.sock")
+    sock = short_sock
     svc = SigningService(priv, pub)
     t = threading.Thread(target=svc.serve_path, args=(sock,), daemon=True)
     t.start()
@@ -233,23 +233,16 @@ def test_malformed_request_does_not_kill_server(service_thread):
     assert cap.is_valid(public_key=pub)
 
 
-def test_run_service_entrypoint(tmp_path):
+def test_run_service_entrypoint(short_sock):
     """run_service() serves a request end-to-end and can be stopped cleanly.
 
     run_service() serves in its own background thread and returns the instance,
-    so we just wait for the socket and capture.
+    so we just wait for readiness and capture.
     """
-    import os as _os
-    import time as _t
-
     from provenance_gate_signer import service as _svc
-    sock = str(tmp_path / "rs.sock")
+    sock = short_sock
     svc = _svc.run_service(sock)  # type: ignore[call-arg]
-    for _ in range(200):
-        if _os.path.exists(sock):
-            break
-        _t.sleep(0.01)
-    else:
+    if not svc._ready.wait(timeout=5):
         raise RuntimeError("run_service socket never appeared")
     try:
         client = CaptureClient(sock_path=sock)
@@ -259,24 +252,17 @@ def test_run_service_entrypoint(tmp_path):
         svc.shutdown()
 
 
-def test_run_service_generates_keys_when_absent(tmp_path):
+def test_run_service_generates_keys_when_absent(short_sock):
     """run_service() keygen fallback: with no keys supplied it generates a
     valid Ed25519 keypair and serves real signed captures.
 
     run_service() now serves in its own background thread and returns the
-    instance, so we simply wait for the socket to appear and then capture.
+    instance, so we simply wait for readiness and then capture.
     """
-    import os as _os
-    import time as _t
-
     from provenance_gate_signer import service as _svc
-    sock = str(tmp_path / "rs2.sock")
+    sock = short_sock
     svc = _svc.run_service(sock)  # no keys -> generate_keypair() branch
-    for _ in range(200):
-        if _os.path.exists(sock):
-            break
-        _t.sleep(0.01)
-    else:
+    if not svc._ready.wait(timeout=5):
         raise RuntimeError("run_service socket never appeared")
     try:
         client = CaptureClient(sock_path=sock)

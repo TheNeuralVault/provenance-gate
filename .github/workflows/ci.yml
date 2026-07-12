@@ -57,7 +57,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # POSIX-only: the signer's security boundary is an AF_UNIX socket, which
+        # CPython does not expose on Windows (cpython #77589 open; typeshed
+        # excludes AF_UNIX on win32). Core still covers Windows separately.
+        os: [ubuntu-latest, macos-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:

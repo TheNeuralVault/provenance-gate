@@ -166,7 +166,10 @@ jobs:
           pip install bandit
           bandit -c bandit.yaml -r src extensions -x '*/tests/*,*/build/*'
       - name: Semgrep
-        # Pinned to full commit SHA (supply-chain integrity).
-        uses: returntocorp/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e4
+        # Pinned to full commit SHA (supply-chain integrity). The action's
+        # repo moved returntocorp/semgrep-action -> semgrep/semgrep-action; the
+        # GH Actions SHA resolver follows the *tag* redirect but NOT a raw-SHA
+        # redirect, so the SHA must be pinned under the CURRENT owner.
+        uses: semgrep/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e5d
         with:
           config: semgrep.yml

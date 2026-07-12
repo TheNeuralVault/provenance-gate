@@ -35,6 +35,9 @@ class SigningService:
         # Controllable shutdown so the (otherwise infinite) serve loops can be
         # stopped cleanly in tests and production — without leaking threads.
         self._stop = threading.Event()
+        # Set once the socket is bound AND listening, so clients/tests can wait
+        # for genuine readiness instead of racing bind() vs listen().
+        self._ready = threading.Event()
 
     def shutdown(self) -> None:
         """Signal the serve loop to exit at the next accept timeout."""
@@ -92,6 +95,7 @@ class SigningService:
         srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         srv.bind(sock_path)
         srv.listen(max_clients)
+        self._ready.set()
         try:
             while not self._stop.is_set():
                 srv.settimeout(0.2)

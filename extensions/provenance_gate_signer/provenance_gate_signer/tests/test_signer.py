@@ -9,7 +9,6 @@ to a real SigningService process, real subprocess execution, and assert that:
 
 from __future__ import annotations
 
-import os
 import threading
 
 import pytest
@@ -32,19 +31,15 @@ def keypair():
 @pytest.fixture
 def service_thread(tmp_path, keypair):
     """Spin up a real SigningService on a UNIX socket in a background thread."""
-    import time
-
     priv, pub = keypair
     sock = str(tmp_path / "sign.sock")
     svc = SigningService(priv, pub)
     t = threading.Thread(target=svc.serve_path, args=(sock,), daemon=True)
     t.start()
-    # wait until the socket actually exists (avoid connect-before-bind race)
-    for _ in range(100):
-        if os.path.exists(sock):
-            break
-        time.sleep(0.01)
-    else:
+    # Wait for the server to be genuinely listening. serve_path sets _ready
+    # after bind()+listen(); polling the file alone races bind() vs listen()
+    # and is OS-dependent (macOS startup lag). No accept is consumed.
+    if not svc._ready.wait(timeout=5):
         raise RuntimeError("signing service socket never appeared: " + sock)
     try:
         yield sock, pub

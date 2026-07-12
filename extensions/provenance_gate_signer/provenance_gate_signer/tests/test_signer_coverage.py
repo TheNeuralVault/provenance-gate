@@ -155,26 +155,17 @@ def test_service_unlink_existing_socket_on_bind(tmp_path, keypair):
     svc = SigningService(priv, pub)
     t = threading.Thread(target=svc.serve_path, args=(sock,), daemon=True)
     t.start()
-    # Wait for the server to be listening. AF_UNIX socket files exist from the
-    # moment of bind(), but accept() isn't armed until listen() runs a few ms
-    # later -- so an early connect races and raises. Retry the full
-    # connect+capture (each attempt is a real request the server serves) until
-    # it succeeds or the deadline passes. Avoids the py3.10 bind/listen race.
-    import time
-
-    deadline = time.monotonic() + 5.0
-    cap = None
-    while time.monotonic() < deadline:
-        try:
-            client = CaptureClient(sock_path=sock)
-            cap = client.capture(["true"])
-            break
-        except OSError:
-            time.sleep(0.02)
-    assert cap is not None, "signing service did not become ready in time"
-    assert cap.is_valid(public_key=pub)
-    svc.shutdown()
-    t.join(timeout=2)
+    # Wait for the server to be genuinely listening. serve_path sets _ready
+    # after bind()+listen(); polling the file alone races bind() vs listen().
+    if not svc._ready.wait(timeout=5):
+        raise RuntimeError("signing service socket never appeared: " + sock)
+    try:
+        client = CaptureClient(sock_path=sock)
+        cap = client.capture(["true"])
+        assert cap.is_valid(public_key=pub)
+    finally:
+        svc.shutdown()
+        t.join(timeout=2)
 
 
 def test_service_tcp_bad_request_error_frame(keypair):

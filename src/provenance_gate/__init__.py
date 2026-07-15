@@ -53,7 +53,7 @@ from provenance_gate.tiers import (
     Tier,
 )
 
-__version__ = "2.0.0"
+__version__ = "2.0.2"
 
 __all__ = [
     "AUTHORIZED",

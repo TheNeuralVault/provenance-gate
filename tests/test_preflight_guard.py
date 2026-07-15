@@ -19,7 +19,7 @@ ENG = "/data/data/com.termux/files/home/agent_forces/_scan/gh_classify/repos/Sov
 
 def _run(args):
     return subprocess.run(
-        [sys.executable, PF] + args, capture_output=True, text=True
+        [sys.executable, PF, *args], capture_output=True, text=True
     )
 
 
@@ -74,9 +74,11 @@ def test_run_ungated_refuses_and_does_not_execute():
 
 def test_verify_tampered_refuses():
     lp = os.path.join(ENG, "governance.ledger.json")
-    raw = json.load(open(lp))
+    with open(lp) as fh:
+        raw = json.load(fh)
     raw[0]["payload"]["content"] = "tampered"
-    json.dump(raw, open(lp, "w"))
+    with open(lp, "w") as fh:
+        json.dump(raw, fh)
     assert _run(["verify", ENG]).returncode == 3
 
 

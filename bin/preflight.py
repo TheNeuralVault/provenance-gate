@@ -51,6 +51,13 @@ def cmd_init(project, actor="agent-lead"):
     # ledger (genesis entry via real AppendOnlyLedger)
     from provenance_gate import AppendOnlyLedger, EvidenceArtifact, Tier
     lp = _ledger_path(project)
+    if os.path.exists(lp):
+        # self-heal: an existing but corrupt (tampered) ledger must not survive
+        # an explicit init -- recreate it clean so the project can be governed.
+        try:
+            AppendOnlyLedger(persist_path=lp).entries()
+        except Exception:
+            os.remove(lp)
     if not os.path.exists(lp):
         led = AppendOnlyLedger(persist_path=lp)
         led.append("genesis-init", actor, "SPEC",

@@ -20,7 +20,9 @@ Exit codes
   3  ledger tamper detected
   1  other error
 """
-import sys, os, json, subprocess
+import os
+import subprocess
+import sys
 
 GATE_MARKER = ".provenance-gate"          # marker file proving gate is wired in
 LEDGER_NAME = "governance.ledger.json"    # project-local hash-chained ledger
@@ -49,7 +51,7 @@ def cmd_init(project, actor="agent-lead"):
     with open(os.path.join(project, GATE_MARKER), "w") as f:
         f.write("provenance-gate v2.0.0 enforced by ~/provenance-gate/bin/preflight.py\n")
     # ledger (genesis entry via real AppendOnlyLedger)
-    from provenance_gate import AppendOnlyLedger, EvidenceArtifact, Tier
+    from provenance_gate import AppendOnlyLedger
     lp = _ledger_path(project)
     if os.path.exists(lp):
         # self-heal: an existing but corrupt (tampered) ledger must not survive
@@ -66,14 +68,16 @@ def cmd_init(project, actor="agent-lead"):
     runner = os.path.join(project, "run_gated.sh")
     central = os.path.abspath(__file__)
     with open(runner, "w") as f:
-        f.write("#!/usr/bin/env bash\n"
-                "# provenance-gated runner: refuses to start if the gate is absent.\n"
-                'exec "%s" run "%s" -- "$@"\n' % (central, project))
+        f.write(
+            "#!/usr/bin/env bash\n"
+            "# provenance-gated runner: refuses to start if the gate is absent.\n"
+            f'exec "{central}" run "{project}" -- "$@"\n'
+        )
     os.chmod(runner, 0o755)
     print(f"[PREFLIGHT] gate installed at {project}")
     print(f"           marker  : {GATE_MARKER}")
     print(f"           ledger  : {LEDGER_NAME}")
-    print(f"           runner  : run_gated.sh  (use it instead of running the project directly)")
+    print("           runner  : run_gated.sh  (use it instead of running the project directly)")
     return 0
 
 

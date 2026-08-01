@@ -225,7 +225,7 @@ F["pyproject.toml"] = dedent(
 
     [project]
     name = "provenance-gate"
-    version = "2.0.0"
+    version = "2.0.2"
     description = "Gate agent actions by evidence quality tier with structural governance and actor lineage"
     requires-python = ">=3.10"
     license = {text = "MIT"}
@@ -342,7 +342,7 @@ F["src/provenance_gate/__init__.py"] = dedent(
     from provenance_gate.actors import Actor
     from provenance_gate.governance import requires_authority, governed_step
 
-    __version__ = "2.0.0"
+    __version__ = "2.0.2"
 
     __all__ = [
         "Tier",
@@ -1384,7 +1384,7 @@ def main() -> None:
         path = BASE / path_str
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
-    print(f"provenance-gate v2.0.0 tree written under {BASE}")
+    print(f"provenance-gate v2.0.2 tree written under {BASE}")
 
 
 if __name__ == "__main__":

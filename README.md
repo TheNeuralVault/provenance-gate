@@ -20,7 +20,10 @@ proof. That is a hallucination vector at the exact moment power is exercised
 (writing code, signing, shipping). `provenance-gate` closes that gap by
 requiring tiered, signed, auditable evidence before any such action runs.
 
-## Install
+## Install  
+New to the command line? 
+See [INSTALL.md](INSTALL.md) 
+for a step-by-step beginner guide.
 
 ```bash
 pip install provenance-gate
